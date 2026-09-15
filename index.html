@@ -1,1 +1,156 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>おとっきー AR</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;font-family:sans-serif}#video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}#canvas{display:none}#arImage{position:fixed;display:none;pointer-events:none;z-index:5;transform-origin:center center}#msg{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:10;color:#fff;background:#000b;padding:9px 14px;border-radius:20px;font-size:14px;white-space:nowrap}</style></head><body><video id="video" autoplay playsinline muted></video><canvas id="canvas"></canvas><img id="arImage" src="otokkky.png"><div id="msg">QRコードをカメラに映してください</div><script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script><script>const v=document.getElementById('video'),c=document.getElementById('canvas'),x=c.getContext('2d',{willReadFrequently:true}),im=document.getElementById('arImage'),m=document.getElementById('msg');async function start(){try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});v.srcObject=s;await v.play();m.textContent='QRコードを探しています…';requestAnimationFrame(scan)}catch(e){m.textContent='カメラを使用できません。HTTPS接続とカメラ許可を確認してください。'}}function scan(){if(v.readyState>=2){const w=480,h=Math.round(w*v.videoHeight/v.videoWidth);c.width=w;c.height=h;x.drawImage(v,0,0,w,h);const d=x.getImageData(0,0,w,h),q=jsQR(d.data,w,h,{inversionAttempts:'dontInvert'});if(q&&q.location){const p=q.location,tl=p.topLeftCorner,tr=p.topRightCorner,bl=p.bottomLeftCorner,br=p.bottomRightCorner;const cx=(tl.x+tr.x+bl.x+br.x)/4,cy=(tl.y+tr.y+bl.y+br.y)/4,qw=Math.hypot(tr.x-tl.x,tr.y-tl.y),qh=Math.hypot(bl.x-tl.x,bl.y-tl.y),ang=Math.atan2(tr.y-tl.y,tr.x-tl.x)*180/Math.PI,sx=innerWidth/w,sy=innerHeight/h;im.style.display='block';im.style.width=(qw*sx*4)+'px';im.style.left=(cx*sx)+'px';im.style.top=(cy*sy-qh*0.95*sy)+'px';im.style.transform=`translate(-50%,-50%) rotate(${ang}deg)`;m.textContent='AR表示中'}else{im.style.display='none';m.textContent='QRコードを探しています…'}}requestAnimationFrame(scan)}start();</script></body></html>
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>おとっきー AR（画像認識版）</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;font-family:sans-serif}
+#video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}
+#work{display:none}
+#overlay{position:fixed;left:0;top:0;width:0;height:0;transform-origin:0 0;display:none;pointer-events:none;z-index:10}
+#overlay img{width:100%;height:100%;display:block;object-fit:fill;filter:drop-shadow(0 5px 8px rgba(0,0,0,.35))}
+#msg{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:20;
+background:rgba(0,0,0,.68);color:#fff;padding:10px 16px;border-radius:22px;font-size:14px;white-space:nowrap}
+</style>
+</head>
+<body>
+<video id="video" autoplay muted playsinline></video>
+<canvas id="work"></canvas>
+<div id="overlay"><img src="otokkky.png"></div>
+<div id="msg">カメラを起動しています…</div>
+
+<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+<script>
+const video=document.getElementById('video');
+const canvas=document.getElementById('work');
+const ctx=canvas.getContext('2d',{willReadFrequently:true});
+const overlay=document.getElementById('overlay');
+const msg=document.getElementById('msg');
+
+let markerImg=null, markerReady=false, running=false;
+const marker = new Image();
+marker.onload=()=>{ markerReady=true; };
+marker.src='marker.jpg';
+
+async function start(){
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},
+      audio:false
+    });
+    video.srcObject=stream;
+    await video.play();
+    msg.textContent='カードをカメラに映してください…';
+    waitOpenCV();
+  }catch(e){
+    console.error(e);
+    msg.textContent='カメラを使用できません。HTTPS接続とカメラ許可を確認してください。';
+  }
+}
+function waitOpenCV(){
+  if(typeof cv!=='undefined' && cv.Mat){ running=true; requestAnimationFrame(loop); }
+  else setTimeout(waitOpenCV,200);
+}
+
+let ref=null, orb=null, matcher=null, refKey=null;
+function initCV(){
+  if(ref) return;
+  const tmp=document.createElement('canvas');
+  tmp.width=marker.naturalWidth; tmp.height=marker.naturalHeight;
+  tmp.getContext('2d').drawImage(marker,0,0);
+  const img=cv.imread(tmp);
+  ref=new cv.Mat(); cv.cvtColor(img,ref,cv.COLOR_RGBA2GRAY);
+  orb=new cv.ORB(900);
+  const kp=new cv.KeyPointVector(), des=new cv.Mat();
+  orb.detectAndCompute(ref,new cv.Mat(),kp,des);
+  refKey={kp,des};
+  matcher=new cv.BFMatcher(cv.NORM_HAMMING,false);
+  img.delete();
+}
+
+function homographyFromMatches(frameGray){
+  const kp2=new cv.KeyPointVector(), des2=new cv.Mat();
+  orb.detectAndCompute(frameGray,new cv.Mat(),kp2,des2);
+  if(des2.empty()) {kp2.delete();des2.delete();return null;}
+  const knn=new cv.DMatchVectorVector();
+  matcher.knnMatch(refKey.des,des2,knn,2);
+  const srcPts=[], dstPts=[];
+  for(let i=0;i<knn.size();i++){
+    const v=knn.get(i);
+    if(v.size()<2) continue;
+    const m=v.get(0), n=v.get(1);
+    if(m.distance < 0.72*n.distance){
+      const a=refKey.kp.get(m.queryIdx).pt, b=kp2.get(m.trainIdx).pt;
+      srcPts.push(a.x,a.y); dstPts.push(b.x,b.y);
+    }
+  }
+  let H=null;
+  if(srcPts.length>=16){
+    const s=cv.matFromArray(srcPts.length/2,1,cv.CV_32FC2,srcPts);
+    const t=cv.matFromArray(dstPts.length/2,1,cv.CV_32FC2,dstPts);
+    const mask=new cv.Mat();
+    H=cv.findHomography(s,t,cv.RANSAC,5,mask);
+    s.delete();t.delete();mask.delete();
+  }
+  knn.delete();kp2.delete();des2.delete();
+  return H;
+}
+
+// Convert 3x3 homography (camera pixel coords) to CSS matrix3d for an image
+// whose intrinsic size is marker naturalWidth x marker naturalHeight.
+function setOverlay(H, vw, vh){
+  const data=H.data64F || H.data32F;
+  if(!data) return false;
+  const h00=data[0],h01=data[1],h02=data[2];
+  const h10=data[3],h11=data[4],h12=data[5];
+  const h20=data[6],h21=data[7],h22=data[8];
+  if(!isFinite(h00)||!isFinite(h11)||Math.abs(h22)<1e-9) return false;
+
+  // Normalize H so h22=1.
+  const a=h00/h22,b=h01/h22,c=h02/h22;
+  const d=h10/h22,e=h11/h22,f=h12/h22;
+  const g=h20/h22,h=h21/h22;
+
+  // CSS transform maps the element's local (x,y) to viewport.
+  // We use a 3D matrix with perspective terms so the plane follows the card.
+  overlay.style.width=marker.naturalWidth+'px';
+  overlay.style.height=marker.naturalHeight+'px';
+  overlay.style.display='block';
+  overlay.style.transformOrigin='0 0';
+  overlay.style.transform=
+    `matrix3d(${a},${d},0,${g},${b},${e},0,${h},0,0,1,0,${c},${f},0,1)`;
+  return true;
+}
+
+let frameSkip=0;
+function loop(){
+  if(!running) return;
+  if(video.readyState>=2 && markerReady){
+    initCV();
+    // Process at reduced resolution for mobile performance.
+    const vw=640;
+    const vh=Math.round(vw*video.videoHeight/video.videoWidth);
+    canvas.width=vw; canvas.height=vh;
+    ctx.drawImage(video,0,0,vw,vh);
+    let rgba=cv.imread(canvas), gray=new cv.Mat();
+    cv.cvtColor(rgba,gray,cv.COLOR_RGBA2GRAY);
+
+    const H=homographyFromMatches(gray);
+    if(H && !H.empty()){
+      // H coordinates are in the 640xvh processing image.
+      setOverlay(H,vw,vh);
+      msg.textContent='カードを認識しています';
+      H.delete();
+    }else{
+      overlay.style.display='none';
+      msg.textContent='カードを探しています…';
+    }
+    rgba.delete();gray.delete();
+  }
+  requestAnimationFrame(loop);
+}
+start();
+</script>
+</body>
+</html>
