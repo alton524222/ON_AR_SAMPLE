@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="ja">
+
 <head>
 
 <meta charset="utf-8">
@@ -10,6 +11,7 @@
 >
 
 <title>おとっきー AR</title>
+
 
 <style>
 
@@ -33,7 +35,6 @@ body{
 ================================================== */
 
 #video{
-
   position:fixed;
 
   left:0;
@@ -67,11 +68,10 @@ body{
 
 
 /* ==================================================
-   AR表示
+   AR画像
 ================================================== */
 
 #arImage{
-
   position:fixed;
 
   display:none;
@@ -85,6 +85,9 @@ body{
   user-select:none;
 
   -webkit-user-drag:none;
+
+  max-width:none;
+  max-height:none;
 }
 
 
@@ -93,7 +96,6 @@ body{
 ================================================== */
 
 #msg{
-
   position:fixed;
 
   z-index:20;
@@ -427,9 +429,17 @@ const ALLOWED_QR =
 
 
 /*
+ * AR画像
+ */
+
+const AR_IMAGE =
+  "HZK.png";
+
+
+/*
  * AR画像の幅
  *
- * QRコードの幅 × 8
+ * QRコードの幅 × 3
  */
 
 const AR_WIDTH_SCALE =
@@ -440,11 +450,23 @@ const AR_WIDTH_SCALE =
  * AR画像の上下位置
  *
  * QRコードの高さ × 6
- * 上方向へ移動
+ *
+ * マイナス方向＝上
  */
 
 const AR_OFFSET_Y_SCALE =
   6;
+
+
+/*
+ * QRを一時的に見失っても
+ * ARを維持するフレーム数
+ *
+ * 30fpsなら約0.5秒
+ */
+
+const LOST_LIMIT =
+  15;
 
 
 /*
@@ -459,25 +481,37 @@ const JPEG_QUALITY =
    状態
 ================================================== */
 
-let stream = null;
+let stream =
+  null;
 
-let running = false;
+let running =
+  false;
 
 
 /*
  * 現在のAR情報
  *
- * すべて「カメラ映像座標」で保持する
+ * カメラ映像座標で保持
  */
 
-let currentAR = null;
+let currentAR =
+  null;
+
+
+/*
+ * QRを見失った連続フレーム数
+ */
+
+let lostCount =
+  0;
 
 
 /*
  * AR画像読み込み状態
  */
 
-let arImageReady = false;
+let arImageReady =
+  false;
 
 
 /* ==================================================
@@ -487,19 +521,48 @@ let arImageReady = false;
 arImage.onload =
   function(){
 
-    arImageReady = true;
+    arImageReady =
+      true;
+
+    console.log(
+      "AR画像読み込み完了:",
+      AR_IMAGE
+    );
+
+
+    /*
+     * 画像読み込み前に
+     * QRを認識していた場合
+     *
+     * 読み込み完了後に表示
+     */
+
+    if(currentAR){
+
+      renderAROnScreen();
+
+    }
 
   };
 
 
+/* ==================================================
+   AR画像読み込みエラー
+================================================== */
+
 arImage.onerror =
   function(){
 
-    arImageReady = false;
+    arImageReady =
+      false;
 
     console.error(
-      "otokkky.pngを読み込めません"
+      "AR画像を読み込めません:",
+      AR_IMAGE
     );
+
+    msg.textContent =
+      "AR画像を読み込めません";
 
   };
 
@@ -550,10 +613,13 @@ startButton.onclick =
         "QRコードを探しています…";
 
 
-      running = true;
+      running =
+        true;
 
 
-      requestAnimationFrame(scan);
+      requestAnimationFrame(
+        scan
+      );
 
 
     }catch(error){
@@ -588,9 +654,7 @@ function scan(){
   ){
 
     /*
-     * カメラ映像の実サイズを使用
-     *
-     * これを全処理の基準にする
+     * カメラ映像の実サイズ
      */
 
     const w =
@@ -604,15 +668,22 @@ function scan(){
      * QR認識Canvas
      */
 
-    scanCanvas.width =
-      w;
+    if(
+      scanCanvas.width !== w ||
+      scanCanvas.height !== h
+    ){
 
-    scanCanvas.height =
-      h;
+      scanCanvas.width =
+        w;
+
+      scanCanvas.height =
+        h;
+
+    }
 
 
     /*
-     * カメラ映像をそのまま描画
+     * カメラ映像をCanvasへ
      */
 
     scanCtx.drawImage(
@@ -649,9 +720,9 @@ function scan(){
       );
 
 
-    /*
-     * 指定QRだけ許可
-     */
+    /* ==================================================
+       QRを正常認識
+    ================================================== */
 
     if(
       qr &&
@@ -659,20 +730,95 @@ function scan(){
       qr.data === ALLOWED_QR
     ){
 
+      /*
+       * 認識成功なので
+       * 見失いカウンターをリセット
+       */
+
+      lostCount =
+        0;
+
+
+      /*
+       * 最新位置へ更新
+       */
+
       updateAR(
         qr.location
       );
 
-    }else{
 
-      hideAR();
+      msg.textContent =
+        "AR表示中";
+
+
+      captureButton.style.display =
+        "block";
+
+    }
+
+
+    /* ==================================================
+       QRを見失った
+    ================================================== */
+
+    else{
+
+      /*
+       * すでにAR表示中の場合のみ
+       * 見失いカウントを増やす
+       */
+
+      if(currentAR){
+
+        lostCount++;
+
+
+        /*
+         * まだ許容範囲
+         *
+         * → ARを消さない
+         */
+
+        if(
+          lostCount <
+          LOST_LIMIT
+        ){
+
+          /*
+           * 最後に認識したARを
+           * そのまま表示し続ける
+           */
+
+          renderAROnScreen();
+
+
+          msg.textContent =
+            "AR表示中";
+
+
+        }else{
+
+          /*
+           * 一定時間見失った
+           *
+           * → ARを消す
+           */
+
+          hideAR();
+
+        }
+
+      }
 
     }
 
   }
 
 
-  requestAnimationFrame(scan);
+  requestAnimationFrame(
+    scan
+  );
 
 }
 
@@ -757,8 +903,6 @@ function updateAR(location){
 
   /*
    * AR中心
-   *
-   * QRから上方向
    */
 
   const arX =
@@ -771,7 +915,7 @@ function updateAR(location){
 
 
   /*
-   * ARサイズ
+   * AR幅
    */
 
   const arWidth =
@@ -779,10 +923,7 @@ function updateAR(location){
 
 
   /*
-   * AR情報を保存
-   *
-   * ここから先は
-   * 「カメラ映像座標」が唯一の基準
+   * 現在のAR情報を保存
    */
 
   currentAR = {
@@ -795,29 +936,20 @@ function updateAR(location){
 
     angle:angle,
 
-    cameraWidth:video.videoWidth,
+    cameraWidth:
+      video.videoWidth,
 
-    cameraHeight:video.videoHeight
+    cameraHeight:
+      video.videoHeight
 
   };
 
 
   /*
-   * 画面上へ表示
+   * 画面表示
    */
 
   renderAROnScreen();
-
-
-  /*
-   * UI
-   */
-
-  msg.textContent =
-    "AR表示中";
-
-  captureButton.style.display =
-    "block";
 
 }
 
@@ -829,6 +961,20 @@ function updateAR(location){
 function renderAROnScreen(){
 
   if(!currentAR){
+
+    return;
+
+  }
+
+
+  /*
+   * 画像がまだ読み込まれていない
+   */
+
+  if(
+    !arImageReady ||
+    arImage.naturalWidth <= 0
+  ){
 
     return;
 
@@ -858,8 +1004,9 @@ function renderAROnScreen(){
 
 
   /*
-   * object-fit:coverと
-   * 完全に同じ倍率を計算
+   * videoの
+   * object-fit:cover
+   * と同じ倍率
    */
 
   const scale =
@@ -870,7 +1017,7 @@ function renderAROnScreen(){
 
 
   /*
-   * 実際に表示されるカメラ映像サイズ
+   * 画面上でのカメラ映像サイズ
    */
 
   const displayWidth =
@@ -881,47 +1028,50 @@ function renderAROnScreen(){
 
 
   /*
-   * 中央配置
+   * 中央配置によるオフセット
    */
 
   const offsetX =
-    (sw - displayWidth) / 2;
+    (
+      sw -
+      displayWidth
+    ) / 2;
+
 
   const offsetY =
-    (sh - displayHeight) / 2;
+    (
+      sh -
+      displayHeight
+    ) / 2;
 
 
   /*
    * カメラ座標
+   *
    * ↓
+   *
    * 画面座標
    */
 
   const screenX =
     offsetX +
-    currentAR.x * scale;
+    currentAR.x *
+    scale;
 
 
   const screenY =
     offsetY +
-    currentAR.y * scale;
-
-
-  const screenWidth =
-    currentAR.width * scale;
+    currentAR.y *
+    scale;
 
 
   /*
-   * AR画像の高さ
+   * AR画像サイズ
    */
 
-  const aspect =
-    arImage.naturalHeight /
-    arImage.naturalWidth;
-
-
-  const screenHeight =
-    screenWidth * aspect;
+  const screenWidth =
+    currentAR.width *
+    scale;
 
 
   /*
@@ -937,7 +1087,7 @@ function renderAROnScreen(){
 
 
   arImage.style.height =
-    screenHeight + "px";
+    "auto";
 
 
   arImage.style.left =
@@ -950,8 +1100,11 @@ function renderAROnScreen(){
 
   arImage.style.transform =
     "translate(-50%,-50%) rotate(" +
-    currentAR.angle *
-    180 / Math.PI +
+    (
+      currentAR.angle *
+      180 /
+      Math.PI
+    ) +
     "deg)";
 
 }
@@ -971,12 +1124,17 @@ function hideAR(){
     null;
 
 
+  lostCount =
+    0;
+
+
   captureButton.style.display =
     "none";
 
 
   saveButton.style.display =
     "none";
+
 
   msg.textContent =
     "QRコードを探しています…";
@@ -993,8 +1151,8 @@ window.addEventListener(
   function(){
 
     /*
-     * 現在のQR情報を使って
-     * 画面表示だけ再計算
+     * QRの再認識を待たず、
+     * 現在のAR位置を再計算
      */
 
     if(currentAR){
@@ -1015,7 +1173,7 @@ captureButton.onclick =
   function(){
 
     /*
-     * QR確認
+     * AR確認
      */
 
     if(!currentAR){
@@ -1029,7 +1187,7 @@ captureButton.onclick =
 
 
     /*
-     * AR画像確認
+     * 画像確認
      */
 
     if(
@@ -1048,9 +1206,6 @@ captureButton.onclick =
 
     /*
      * カメラ映像サイズ
-     *
-     * currentARを取得した時と
-     * 同じ座標系
      */
 
     const w =
@@ -1072,7 +1227,7 @@ captureButton.onclick =
 
 
     /*
-     * カメラ映像
+     * カメラ映像を描画
      */
 
     photoCtx.clearRect(
@@ -1105,20 +1260,11 @@ captureButton.onclick =
 
 
     /*
-     * AR画像を描画
-     *
-     * currentARの座標は
-     * カメラ映像そのものの座標なので、
-     * 画面表示時のobject-fit:coverは
-     * ここでは一切考慮しない。
+     * AR画像を合成
      */
 
     photoCtx.save();
 
-
-    /*
-     * AR画像中心へ移動
-     */
 
     photoCtx.translate(
       currentAR.x,
@@ -1126,18 +1272,10 @@ captureButton.onclick =
     );
 
 
-    /*
-     * QRと同じ角度
-     */
-
     photoCtx.rotate(
       currentAR.angle
     );
 
-
-    /*
-     * 中心基準で画像描画
-     */
 
     photoCtx.drawImage(
 
@@ -1241,7 +1379,7 @@ captureButton.onclick =
           now.getFullYear() +
 
           String(
-            now.getMonth()+1
+            now.getMonth() + 1
           ).padStart(2,"0") +
 
           String(
@@ -1280,7 +1418,6 @@ captureButton.onclick =
         msg.textContent =
           "撮影しました！";
 
-
       },
 
       "image/jpeg",
@@ -1293,7 +1430,7 @@ captureButton.onclick =
 
 
 /* ==================================================
-   ページ終了
+   ページ終了時
 ================================================== */
 
 window.addEventListener(
@@ -1331,4 +1468,5 @@ window.addEventListener(
 </script>
 
 </body>
+
 </html>
