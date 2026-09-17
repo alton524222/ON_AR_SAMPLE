@@ -1,6 +1,5 @@
 <!doctype html>
 <html lang="ja">
-
 <head>
 
 <meta charset="utf-8">
@@ -14,31 +13,65 @@
 
 <style>
 
+/* ==================================================
+   全体
+================================================== */
+
 html,
 body{
   margin:0;
   width:100%;
   height:100%;
   overflow:hidden;
-  background:#111;
+  background:#000;
   font-family:sans-serif;
 }
 
+
+/* ==================================================
+   カメラ映像
+================================================== */
+
 #video{
+
   position:fixed;
-  inset:0;
+
+  left:0;
+  top:0;
 
   width:100%;
   height:100%;
 
   object-fit:cover;
+
+  background:#000;
 }
 
-#canvas{
+
+/* ==================================================
+   QR認識用Canvas
+================================================== */
+
+#scanCanvas{
   display:none;
 }
 
+
+/* ==================================================
+   撮影用Canvas
+================================================== */
+
+#photoCanvas{
+  display:none;
+}
+
+
+/* ==================================================
+   AR表示
+================================================== */
+
 #arImage{
+
   position:fixed;
 
   display:none;
@@ -49,96 +82,191 @@ body{
 
   transform-origin:center center;
 
-  max-width:none;
-  max-height:none;
+  user-select:none;
+
+  -webkit-user-drag:none;
 }
 
+
+/* ==================================================
+   メッセージ
+================================================== */
+
 #msg{
+
   position:fixed;
+
+  z-index:20;
 
   top:14px;
   left:50%;
 
   transform:translateX(-50%);
 
-  z-index:20;
-
   color:#fff;
 
   background:rgba(0,0,0,.75);
 
-  padding:9px 14px;
+  padding:9px 16px;
 
   border-radius:20px;
 
   font-size:14px;
 
   white-space:nowrap;
+
+  text-align:center;
 }
 
+
+/* ==================================================
+   撮影ボタン
+================================================== */
+
 #capture{
+
   position:fixed;
+
+  z-index:30;
 
   left:50%;
   bottom:25px;
 
   transform:translateX(-50%);
 
-  z-index:20;
-
-  display:none;
-
-  width:70px;
-  height:70px;
+  width:78px;
+  height:78px;
 
   border-radius:50%;
 
-  border:5px solid white;
+  border:6px solid #fff;
 
-  background:#222;
+  background:#fff;
 
-  color:white;
-
-  font-size:20px;
-}
-
-#save{
-  position:fixed;
-
-  left:50%;
-  bottom:110px;
-
-  transform:translateX(-50%);
-
-  z-index:20;
+  box-shadow:
+    0 2px 12px rgba(0,0,0,.6);
 
   display:none;
 
-  padding:12px 20px;
+  padding:0;
 
-  border-radius:20px;
+  cursor:pointer;
 
-  background:white;
+  -webkit-tap-highlight-color:transparent;
+}
+
+
+/* 撮影ボタン中央 */
+
+#capture::after{
+
+  content:"";
+
+  position:absolute;
+
+  left:50%;
+  top:50%;
+
+  width:58px;
+  height:58px;
+
+  transform:translate(-50%,-50%);
+
+  border-radius:50%;
+
+  background:#222;
+}
+
+
+/* ==================================================
+   保存ボタン
+================================================== */
+
+#save{
+
+  position:fixed;
+
+  z-index:30;
+
+  left:50%;
+  bottom:125px;
+
+  transform:translateX(-50%);
+
+  display:none;
+
+  padding:12px 22px;
+
+  border-radius:22px;
+
+  background:#fff;
 
   color:#111;
 
   text-decoration:none;
 
+  font-size:15px;
+
   font-weight:bold;
+
+  box-shadow:
+    0 2px 12px rgba(0,0,0,.6);
+
+  white-space:nowrap;
 }
 
+
+/* ==================================================
+   フラッシュ
+================================================== */
+
 #flash{
+
   position:fixed;
 
   inset:0;
 
   z-index:100;
 
-  background:white;
+  background:#fff;
 
   opacity:0;
 
   pointer-events:none;
+}
+
+
+/* ==================================================
+   カメラ開始ボタン
+================================================== */
+
+#start{
+
+  position:fixed;
+
+  z-index:40;
+
+  left:50%;
+  bottom:30px;
+
+  transform:translateX(-50%);
+
+  padding:15px 28px;
+
+  border:0;
+
+  border-radius:25px;
+
+  background:#fff;
+
+  color:#111;
+
+  font-size:16px;
+
+  font-weight:bold;
+
+  box-shadow:
+    0 2px 12px rgba(0,0,0,.6);
 }
 
 </style>
@@ -149,6 +277,10 @@ body{
 <body>
 
 
+<!-- ==================================================
+     カメラ
+================================================== -->
+
 <video
   id="video"
   autoplay
@@ -157,36 +289,81 @@ body{
 ></video>
 
 
-<canvas id="canvas"></canvas>
+<!-- ==================================================
+     QR認識用
+================================================== -->
 
+<canvas id="scanCanvas"></canvas>
+
+
+<!-- ==================================================
+     撮影用
+================================================== -->
+
+<canvas id="photoCanvas"></canvas>
+
+
+<!-- ==================================================
+     AR画像
+================================================== -->
 
 <img
   id="arImage"
-  src=""
+  src="HZK.png"
   alt=""
 >
 
 
+<!-- ==================================================
+     メッセージ
+================================================== -->
+
 <div id="msg">
-  QRコードをカメラに映してください
+  カメラを開始してください
 </div>
 
 
-<button id="capture">
-  ●
+<!-- ==================================================
+     開始ボタン
+================================================== -->
+
+<button id="start">
+  カメラを開始
 </button>
 
 
+<!-- ==================================================
+     撮影ボタン
+================================================== -->
+
+<button
+  id="capture"
+  aria-label="撮影"
+></button>
+
+
+<!-- ==================================================
+     保存
+================================================== -->
+
 <a
   id="save"
-  download="AR_photo.jpg"
+  download="otokkky_AR.jpg"
 >
   写真を保存
 </a>
 
 
+<!-- ==================================================
+     フラッシュ
+================================================== -->
+
 <div id="flash"></div>
 
+
+<!-- ==================================================
+     jsQR
+================================================== -->
 
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
@@ -197,30 +374,39 @@ body{
    DOM
 ================================================== */
 
-const v =
+const video =
   document.getElementById("video");
 
-const c =
-  document.getElementById("canvas");
+const scanCanvas =
+  document.getElementById("scanCanvas");
 
-const x =
-  c.getContext(
+const scanCtx =
+  scanCanvas.getContext(
     "2d",
     {
       willReadFrequently:true
     }
   );
 
-const im =
+const photoCanvas =
+  document.getElementById("photoCanvas");
+
+const photoCtx =
+  photoCanvas.getContext("2d");
+
+const arImage =
   document.getElementById("arImage");
 
-const m =
+const msg =
   document.getElementById("msg");
 
-const capture =
+const startButton =
+  document.getElementById("start");
+
+const captureButton =
   document.getElementById("capture");
 
-const save =
+const saveButton =
   document.getElementById("save");
 
 const flash =
@@ -228,204 +414,156 @@ const flash =
 
 
 /* ==================================================
-   QR → AR画像
+   設定
 ================================================== */
 
-const AR_IMAGES = {
 
-  "OTOKKY_AR_001":
-    "otokkky.png",
+/*
+ * この内容のQRだけを有効にする
+ */
 
-  "HZK＿AR":
-    "HZK.PNG"
+const ALLOWED_QR =
+  "HZK_AR";
 
-};
+
+/*
+ * AR画像の幅
+ *
+ * QRコードの幅 × 8
+ */
+
+const AR_WIDTH_SCALE =
+  8;
+
+
+/*
+ * AR画像の上下位置
+ *
+ * QRコードの高さ × 6
+ * 上方向へ移動
+ */
+
+const AR_OFFSET_Y_SCALE =
+  6;
+
+
+/*
+ * JPEG品質
+ */
+
+const JPEG_QUALITY =
+  0.95;
 
 
 /* ==================================================
-   現在の状態
+   状態
 ================================================== */
 
-let currentQR = "";
+let stream = null;
 
-let currentImageFile = "";
+let running = false;
 
-let currentLocation = null;
 
-let imageLoaded = false;
+/*
+ * 現在のAR情報
+ *
+ * すべて「カメラ映像座標」で保持する
+ */
+
+let currentAR = null;
+
+
+/*
+ * AR画像読み込み状態
+ */
+
+let arImageReady = false;
 
 
 /* ==================================================
-   AR設定
+   AR画像読み込み
 ================================================== */
 
-const IMAGE_SCALE = 8;
+arImage.onload =
+  function(){
 
-const IMAGE_OFFSET = 6;
+    arImageReady = true;
+
+  };
+
+
+arImage.onerror =
+  function(){
+
+    arImageReady = false;
+
+    console.error(
+      "otokkky.pngを読み込めません"
+    );
+
+  };
 
 
 /* ==================================================
    カメラ開始
 ================================================== */
 
-async function startCamera(){
+startButton.onclick =
+  async function(){
 
-  try{
+    try{
 
-    const stream =
-      await navigator.mediaDevices.getUserMedia({
+      stream =
+        await navigator.mediaDevices.getUserMedia({
 
-        video:{
-          facingMode:{
-            ideal:"environment"
-          }
-        },
+          video:{
+            facingMode:{
+              ideal:"environment"
+            },
 
-        audio:false
+            width:{
+              ideal:1920
+            },
 
-      });
+            height:{
+              ideal:1080
+            }
+          },
 
+          audio:false
 
-    v.srcObject =
-      stream;
-
-    await v.play();
-
-
-    m.textContent =
-      "QRコードを探しています…";
-
-
-    requestAnimationFrame(
-      scan
-    );
+        });
 
 
-  }catch(e){
-
-    console.error(e);
-
-    m.textContent =
-      "カメラを使用できません。HTTPS接続とカメラ許可を確認してください。";
-
-  }
-
-}
+      video.srcObject =
+        stream;
 
 
-/* ==================================================
-   AR画像を変更
-================================================== */
-
-function setARImage(file){
-
-  /*
-   * 同じ画像なら変更しない
-   */
-
-  if(
-    currentImageFile === file
-  ){
-
-    return;
-
-  }
+      await video.play();
 
 
-  /*
-   * 新しい画像
-   */
-
-  currentImageFile =
-    file;
-
-  imageLoaded =
-    false;
+      startButton.style.display =
+        "none";
 
 
-  /*
-   * いったん非表示
-   */
-
-  im.style.display =
-    "none";
+      msg.textContent =
+        "QRコードを探しています…";
 
 
-  /*
-   * キャッシュ対策として
-   * srcを設定
-   */
-
-  im.src =
-    file;
+      running = true;
 
 
-  console.log(
-    "AR画像変更:",
-    file
-  );
-
-}
+      requestAnimationFrame(scan);
 
 
-/* ==================================================
-   画像読み込み完了
-================================================== */
+    }catch(error){
 
-im.onload =
-  function(){
+      console.error(error);
 
-    imageLoaded =
-      true;
-
-
-    console.log(
-      "AR画像読み込み完了:",
-      im.src,
-
-      "幅:",
-      im.naturalWidth,
-
-      "高さ:",
-      im.naturalHeight
-    );
-
-
-    /*
-     * 現在QRが認識されていれば
-     * 直ちに再表示
-     */
-
-    if(
-      currentLocation
-    ){
-
-      positionAR(
-        currentLocation
-      );
+      msg.textContent =
+        "カメラを使用できません。HTTPS接続とカメラ許可を確認してください。";
 
     }
-
-  };
-
-
-/* ==================================================
-   画像読み込み失敗
-================================================== */
-
-im.onerror =
-  function(){
-
-    imageLoaded =
-      false;
-
-    console.error(
-      "AR画像の読み込みに失敗:",
-      im.src
-    );
-
-    m.textContent =
-      "AR画像を読み込めません";
 
   };
 
@@ -436,39 +574,49 @@ im.onerror =
 
 function scan(){
 
+  if(!running){
+
+    return;
+
+  }
+
+
   if(
-    v.readyState >= 2 &&
-    v.videoWidth > 0
+    video.readyState >= 2 &&
+    video.videoWidth > 0 &&
+    video.videoHeight > 0
   ){
 
     /*
-     * QR認識用画像サイズ
+     * カメラ映像の実サイズを使用
+     *
+     * これを全処理の基準にする
      */
 
     const w =
-      1920;
+      video.videoWidth;
 
     const h =
-      Math.round(
-        w *
-        v.videoHeight /
-        v.videoWidth
-      );
+      video.videoHeight;
 
 
-    c.width =
+    /*
+     * QR認識Canvas
+     */
+
+    scanCanvas.width =
       w;
 
-    c.height =
+    scanCanvas.height =
       h;
 
 
     /*
-     * カメラ映像
+     * カメラ映像をそのまま描画
      */
 
-    x.drawImage(
-      v,
+    scanCtx.drawImage(
+      video,
       0,
       0,
       w,
@@ -477,11 +625,11 @@ function scan(){
 
 
     /*
-     * ピクセル取得
+     * QR認識
      */
 
-    const data =
-      x.getImageData(
+    const imageData =
+      scanCtx.getImageData(
         0,
         0,
         w,
@@ -489,13 +637,9 @@ function scan(){
       );
 
 
-    /*
-     * QR認識
-     */
-
     const qr =
       jsQR(
-        data.data,
+        imageData.data,
         w,
         h,
         {
@@ -505,84 +649,19 @@ function scan(){
       );
 
 
-    /* ==============================================
-       QRあり
-    ============================================== */
+    /*
+     * 指定QRだけ許可
+     */
 
     if(
       qr &&
-      qr.location
+      qr.location &&
+      qr.data === ALLOWED_QR
     ){
 
-      const file =
-        AR_IMAGES[
-          qr.data
-        ];
-
-
-      /*
-       * 登録されたQR
-       */
-
-      if(file){
-
-        currentQR =
-          qr.data;
-
-        currentLocation =
-          qr.location;
-
-
-        /*
-         * AR画像を指定
-         */
-
-        setARImage(
-          file
-        );
-
-
-        /*
-         * AR位置
-         */
-
-        positionAR(
-          qr.location
-        );
-
-
-        /*
-         * メッセージ
-         */
-
-        if(
-          qr.data ===
-          "OTOKKY_AR_001"
-        ){
-
-          m.textContent =
-            "おとっきーAR表示中";
-
-        }else if(
-          qr.data ===
-          "HZK＿AR"
-        ){
-
-          m.textContent =
-            "HZK AR表示中";
-
-        }
-
-
-        capture.style.display =
-          "block";
-
-
-      }else{
-
-        hideAR();
-
-      }
+      updateAR(
+        qr.location
+      );
 
     }else{
 
@@ -593,48 +672,32 @@ function scan(){
   }
 
 
-  requestAnimationFrame(
-    scan
-  );
+  requestAnimationFrame(scan);
 
 }
 
 
 /* ==================================================
-   AR位置計算
+   AR情報更新
 ================================================== */
 
-function positionAR(loc){
+function updateAR(location){
 
   /*
-   * 画像がまだ読み込まれていない
-   * 場合は位置だけ保存
+   * QR四隅
    */
 
-  currentLocation =
-    loc;
-
-
-  if(
-    !imageLoaded
-  ){
-
-    return;
-
-  }
-
-
   const tl =
-    loc.topLeftCorner;
+    location.topLeftCorner;
 
   const tr =
-    loc.topRightCorner;
+    location.topRightCorner;
 
   const bl =
-    loc.bottomLeftCorner;
+    location.bottomLeftCorner;
 
   const br =
-    loc.bottomRightCorner;
+    location.bottomRightCorner;
 
 
   /*
@@ -689,83 +752,143 @@ function positionAR(loc){
     Math.atan2(
       tr.y - tl.y,
       tr.x - tl.x
-    ) *
-    180 /
-    Math.PI;
+    );
 
 
   /*
-   * カメラ座標
+   * AR中心
+   *
+   * QRから上方向
    */
 
   const arX =
     cx;
 
+
   const arY =
     cy -
-    qh * IMAGE_OFFSET;
+    qh * AR_OFFSET_Y_SCALE;
 
 
   /*
-   * object-fit:cover
-   * と同じ表示倍率を計算
+   * ARサイズ
    */
 
-  const screenWidth =
+  const arWidth =
+    qw * AR_WIDTH_SCALE;
+
+
+  /*
+   * AR情報を保存
+   *
+   * ここから先は
+   * 「カメラ映像座標」が唯一の基準
+   */
+
+  currentAR = {
+
+    x:arX,
+
+    y:arY,
+
+    width:arWidth,
+
+    angle:angle,
+
+    cameraWidth:video.videoWidth,
+
+    cameraHeight:video.videoHeight
+
+  };
+
+
+  /*
+   * 画面上へ表示
+   */
+
+  renderAROnScreen();
+
+
+  /*
+   * UI
+   */
+
+  msg.textContent =
+    "AR表示中";
+
+  captureButton.style.display =
+    "block";
+
+}
+
+
+/* ==================================================
+   画面上のAR表示
+================================================== */
+
+function renderAROnScreen(){
+
+  if(!currentAR){
+
+    return;
+
+  }
+
+
+  /*
+   * カメラ映像サイズ
+   */
+
+  const vw =
+    currentAR.cameraWidth;
+
+  const vh =
+    currentAR.cameraHeight;
+
+
+  /*
+   * 画面サイズ
+   */
+
+  const sw =
     window.innerWidth;
 
-  const screenHeight =
+  const sh =
     window.innerHeight;
 
 
-  const cameraWidth =
-    v.videoWidth;
-
-  const cameraHeight =
-    v.videoHeight;
-
+  /*
+   * object-fit:coverと
+   * 完全に同じ倍率を計算
+   */
 
   const scale =
     Math.max(
-      screenWidth /
-        cameraWidth,
-
-      screenHeight /
-        cameraHeight
+      sw / vw,
+      sh / vh
     );
 
 
   /*
-   * 実際に画面へ表示される
-   * カメラ映像サイズ
+   * 実際に表示されるカメラ映像サイズ
    */
 
-  const displayedWidth =
-    cameraWidth *
-    scale;
+  const displayWidth =
+    vw * scale;
 
-  const displayedHeight =
-    cameraHeight *
-    scale;
+  const displayHeight =
+    vh * scale;
 
 
   /*
-   * object-fit:coverによる
-   * クロップ量
+   * 中央配置
    */
 
   const offsetX =
-    (
-      screenWidth -
-      displayedWidth
-    ) / 2;
-
+    (sw - displayWidth) / 2;
 
   const offsetY =
-    (
-      screenHeight -
-      displayedHeight
-    ) / 2;
+    (sh - displayHeight) / 2;
 
 
   /*
@@ -776,51 +899,60 @@ function positionAR(loc){
 
   const screenX =
     offsetX +
-    arX *
-    scale;
+    currentAR.x * scale;
 
 
   const screenY =
     offsetY +
-    arY *
-    scale;
+    currentAR.y * scale;
+
+
+  const screenWidth =
+    currentAR.width * scale;
 
 
   /*
-   * AR画像サイズ
+   * AR画像の高さ
    */
 
-  const width =
-    qw *
-    IMAGE_SCALE *
-    scale;
+  const aspect =
+    arImage.naturalHeight /
+    arImage.naturalWidth;
+
+
+  const screenHeight =
+    screenWidth * aspect;
 
 
   /*
    * 表示
    */
 
-  im.style.width =
-    width + "px";
+  arImage.style.display =
+    "block";
 
-  im.style.height =
-    "auto";
 
-  im.style.left =
+  arImage.style.width =
+    screenWidth + "px";
+
+
+  arImage.style.height =
+    screenHeight + "px";
+
+
+  arImage.style.left =
     screenX + "px";
 
-  im.style.top =
+
+  arImage.style.top =
     screenY + "px";
 
 
-  im.style.transform =
+  arImage.style.transform =
     "translate(-50%,-50%) rotate(" +
-    angle +
+    currentAR.angle *
+    180 / Math.PI +
     "deg)";
-
-
-  im.style.display =
-    "block";
 
 }
 
@@ -831,20 +963,23 @@ function positionAR(loc){
 
 function hideAR(){
 
-  im.style.display =
+  arImage.style.display =
     "none";
 
-  capture.style.display =
-    "none";
 
-  save.style.display =
-    "none";
-
-  currentQR =
-    "";
-
-  currentLocation =
+  currentAR =
     null;
+
+
+  captureButton.style.display =
+    "none";
+
+
+  saveButton.style.display =
+    "none";
+
+  msg.textContent =
+    "QRコードを探しています…";
 
 }
 
@@ -857,13 +992,14 @@ window.addEventListener(
   "resize",
   function(){
 
-    if(
-      currentLocation
-    ){
+    /*
+     * 現在のQR情報を使って
+     * 画面表示だけ再計算
+     */
 
-      positionAR(
-        currentLocation
-      );
+    if(currentAR){
+
+      renderAROnScreen();
 
     }
 
@@ -875,13 +1011,17 @@ window.addEventListener(
    撮影
 ================================================== */
 
-capture.onclick =
+captureButton.onclick =
   function(){
 
-    if(
-      !currentLocation ||
-      !imageLoaded
-    ){
+    /*
+     * QR確認
+     */
+
+    if(!currentAR){
+
+      msg.textContent =
+        "QRコードを認識してください";
 
       return;
 
@@ -889,30 +1029,45 @@ capture.onclick =
 
 
     /*
+     * AR画像確認
+     */
+
+    if(
+      !arImageReady ||
+      !arImage.complete ||
+      arImage.naturalWidth <= 0
+    ){
+
+      msg.textContent =
+        "AR画像を読み込んでいます…";
+
+      return;
+
+    }
+
+
+    /*
+     * カメラ映像サイズ
+     *
+     * currentARを取得した時と
+     * 同じ座標系
+     */
+
+    const w =
+      video.videoWidth;
+
+    const h =
+      video.videoHeight;
+
+
+    /*
      * 撮影Canvas
      */
 
-    const photo =
-      document.createElement(
-        "canvas"
-      );
-
-
-    const pc =
-      photo.getContext("2d");
-
-
-    const w =
-      v.videoWidth;
-
-    const h =
-      v.videoHeight;
-
-
-    photo.width =
+    photoCanvas.width =
       w;
 
-    photo.height =
+    photoCanvas.height =
       h;
 
 
@@ -920,8 +1075,16 @@ capture.onclick =
      * カメラ映像
      */
 
-    pc.drawImage(
-      v,
+    photoCtx.clearRect(
+      0,
+      0,
+      w,
+      h
+    );
+
+
+    photoCtx.drawImage(
+      video,
       0,
       0,
       w,
@@ -930,128 +1093,68 @@ capture.onclick =
 
 
     /*
-     * QR位置
+     * AR画像の高さ
      */
-
-    const loc =
-      currentLocation;
-
-
-    const tl =
-      loc.topLeftCorner;
-
-    const tr =
-      loc.topRightCorner;
-
-    const bl =
-      loc.bottomLeftCorner;
-
-    const br =
-      loc.bottomRightCorner;
-
-
-    const cx =
-      (
-        tl.x +
-        tr.x +
-        bl.x +
-        br.x
-      ) / 4;
-
-
-    const cy =
-      (
-        tl.y +
-        tr.y +
-        bl.y +
-        br.y
-      ) / 4;
-
-
-    const qw =
-      Math.hypot(
-        tr.x - tl.x,
-        tr.y - tl.y
-      );
-
-
-    const qh =
-      Math.hypot(
-        bl.x - tl.x,
-        bl.y - tl.y
-      );
-
-
-    const angle =
-      Math.atan2(
-        tr.y - tl.y,
-        tr.x - tl.x
-      );
-
-
-    /*
-     * ARサイズ
-     */
-
-    const arWidth =
-      qw *
-      IMAGE_SCALE;
-
 
     const arHeight =
-      arWidth *
-      im.naturalHeight /
-      im.naturalWidth;
+      currentAR.width *
+      (
+        arImage.naturalHeight /
+        arImage.naturalWidth
+      );
 
 
     /*
-     * AR位置
+     * AR画像を描画
+     *
+     * currentARの座標は
+     * カメラ映像そのものの座標なので、
+     * 画面表示時のobject-fit:coverは
+     * ここでは一切考慮しない。
      */
 
-    const arX =
-      cx;
-
-
-    const arY =
-      cy -
-      qh *
-      IMAGE_OFFSET;
+    photoCtx.save();
 
 
     /*
-     * 合成
+     * AR画像中心へ移動
      */
 
-    pc.save();
-
-
-    pc.translate(
-      arX,
-      arY
+    photoCtx.translate(
+      currentAR.x,
+      currentAR.y
     );
 
 
-    pc.rotate(
-      angle
+    /*
+     * QRと同じ角度
+     */
+
+    photoCtx.rotate(
+      currentAR.angle
     );
 
 
-    pc.drawImage(
+    /*
+     * 中心基準で画像描画
+     */
 
-      im,
+    photoCtx.drawImage(
 
-      -arWidth / 2,
+      arImage,
+
+      -currentAR.width / 2,
 
       -arHeight / 2,
 
-      arWidth,
+      currentAR.width,
 
       arHeight
 
     );
 
 
-    pc.restore();
+    photoCtx.restore();
 
 
     /*
@@ -1074,19 +1177,41 @@ capture.onclick =
 
 
     /*
-     * 保存
+     * JPEG生成
      */
 
-    photo.toBlob(
+    photoCanvas.toBlob(
 
       function(blob){
 
         if(!blob){
 
+          msg.textContent =
+            "写真を作成できませんでした";
+
           return;
 
         }
 
+
+        /*
+         * 古いURLを解放
+         */
+
+        if(
+          saveButton.dataset.url
+        ){
+
+          URL.revokeObjectURL(
+            saveButton.dataset.url
+          );
+
+        }
+
+
+        /*
+         * 保存用URL
+         */
 
         const url =
           URL.createObjectURL(
@@ -1094,28 +1219,73 @@ capture.onclick =
           );
 
 
-        save.href =
+        saveButton.href =
           url;
 
 
-        save.download =
-          "AR_" +
-          currentQR +
+        saveButton.dataset.url =
+          url;
+
+
+        /*
+         * ファイル名
+         */
+
+        const now =
+          new Date();
+
+
+        const filename =
+          "otokkky_AR_" +
+
+          now.getFullYear() +
+
+          String(
+            now.getMonth()+1
+          ).padStart(2,"0") +
+
+          String(
+            now.getDate()
+          ).padStart(2,"0") +
+
+          "_" +
+
+          String(
+            now.getHours()
+          ).padStart(2,"0") +
+
+          String(
+            now.getMinutes()
+          ).padStart(2,"0") +
+
+          String(
+            now.getSeconds()
+          ).padStart(2,"0") +
+
           ".jpg";
 
 
-        save.style.display =
+        saveButton.download =
+          filename;
+
+
+        /*
+         * 保存ボタン表示
+         */
+
+        saveButton.style.display =
           "block";
 
 
-        m.textContent =
+        msg.textContent =
           "撮影しました！";
+
 
       },
 
       "image/jpeg",
 
-      0.95
+      JPEG_QUALITY
 
     );
 
@@ -1123,10 +1293,40 @@ capture.onclick =
 
 
 /* ==================================================
-   起動
+   ページ終了
 ================================================== */
 
-startCamera();
+window.addEventListener(
+  "beforeunload",
+  function(){
+
+    if(stream){
+
+      stream
+        .getTracks()
+        .forEach(
+          function(track){
+
+            track.stop();
+
+          }
+        );
+
+    }
+
+
+    if(
+      saveButton.dataset.url
+    ){
+
+      URL.revokeObjectURL(
+        saveButton.dataset.url
+      );
+
+    }
+
+  }
+);
 
 </script>
 
